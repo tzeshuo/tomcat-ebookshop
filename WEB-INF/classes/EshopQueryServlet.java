@@ -73,7 +73,7 @@ public class EshopQueryServlet extends HttpServlet {
 		 
          // Step 4: Process the query result
          // Print the <form> start tag
-         out.println("<form method='get' action='eshoporder'>");
+         out.println("<form method='get' action='addtocart'>");
                   		 
          // For each row in ResultSet, print one checkbox inside the <form>
          
