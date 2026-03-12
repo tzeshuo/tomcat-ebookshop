@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopping Cart | Tome</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="cart.css">
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <h1 class="logo"><a href="shop.html">&#x1F4DA; Tome</a></h1>
+      <nav>
+        <a href="cart.html">Cart</a>
+      </nav>
+      <div id="authControls"></div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <h2>Your Shopping Cart</h2>
+    <p class="muted" id="cartSummary">Loading cart...</p>
+
+    <form id="checkoutForm" method="get" action="eshoporder">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="selectAll" aria-label="Select all cart items"></th>
+            <th>ID</th>
+            <th>Author</th>
+            <th>Title</th>
+            <th>Price</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="cartBody">
+          <tr>
+            <td colspan="6" class="status">Loading cart items...</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="actions">
+        <button type="submit" id="checkoutBtn">Checkout Selected</button>
+        <a class="link-btn" href="shop.html">Continue Shopping</a>
+      </div>
+    </form>
+  </main>
+
+  <script src="auth.js"></script>
+  <script>
+    let currentUser = null;
+
+    function renderStatus(message) {
+      const body = document.getElementById("cartBody");
+      body.innerHTML = "";
+
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 6;
+      cell.className = "status";
+      cell.textContent = message;
+      row.appendChild(cell);
+      body.appendChild(row);
+    }
+
+    function updateSummary(items, user) {
+      const summary = document.getElementById("cartSummary");
+
+      if (user) {
+        summary.textContent = "Logged in as: " + user + " | Items in cart: " + items.length;
+      } else {
+        summary.innerHTML =
+          'Items in cart: ' + items.length +
+          ' | <a href="login.html">Login</a> to continue checkout.';
+      }
+    }
+
+    function updateSelectAllState() {
+      const boxes = document.querySelectorAll(".item-select");
+      const checked = document.querySelectorAll(".item-select:checked");
+      const selectAll = document.getElementById("selectAll");
+
+      if (boxes.length === 0) {
+        selectAll.checked = false;
+        selectAll.disabled = true;
+        return;
+      }
+
+      selectAll.disabled = false;
+      selectAll.checked = boxes.length === checked.length;
+    }
+
+    function renderCartItems(items) {
+      const body = document.getElementById("cartBody");
+      const checkoutBtn = document.getElementById("checkoutBtn");
+      body.innerHTML = "";
+
+      if (!items || items.length === 0) {
+        renderStatus("Your cart is empty.");
+        checkoutBtn.disabled = true;
+        updateSelectAllState();
+        return;
+      }
+
+      checkoutBtn.disabled = !currentUser;
+
+      items.forEach(function (item) {
+        const row = document.createElement("tr");
+
+        const selectCell = document.createElement("td");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.name = "id";
+        checkbox.value = String(item.id);
+        checkbox.className = "item-select";
+        checkbox.addEventListener("change", updateSelectAllState);
+        selectCell.appendChild(checkbox);
+
+        const idCell = document.createElement("td");
+        idCell.textContent = String(item.id);
+
+        const authorCell = document.createElement("td");
+        authorCell.textContent = item.author;
+
+        const titleCell = document.createElement("td");
+        titleCell.textContent = item.title;
+
+        const priceCell = document.createElement("td");
+        priceCell.textContent = "$" + item.price;
+
+        const actionCell = document.createElement("td");
+        const removeLink = document.createElement("a");
+        removeLink.href = "removefromcart?id=" + encodeURIComponent(item.id);
+        removeLink.className = "remove-link";
+        removeLink.textContent = "Remove";
+        actionCell.appendChild(removeLink);
+
+        row.appendChild(selectCell);
+        row.appendChild(idCell);
+        row.appendChild(authorCell);
+        row.appendChild(titleCell);
+        row.appendChild(priceCell);
+        row.appendChild(actionCell);
+
+        body.appendChild(row);
+      });
+
+      updateSelectAllState();
+    }
+
+    document.getElementById("selectAll").addEventListener("change", function (event) {
+      const boxes = document.querySelectorAll(".item-select");
+      boxes.forEach(function (box) {
+        box.checked = event.target.checked;
+      });
+      updateSelectAllState();
+    });
+
+    document.getElementById("checkoutForm").addEventListener("submit", function (event) {
+      const selected = document.querySelectorAll(".item-select:checked");
+      if (selected.length === 0) {
+        event.preventDefault();
+        alert("Please select at least one item to checkout.");
+      }
+    });
+
+    fetch("cart", { headers: { "Accept": "application/json" } })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("Unable to load cart.");
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        const items = Array.isArray(data.items) ? data.items : [];
+        currentUser = data.user || null;
+        setAuthControls(currentUser);
+        updateSummary(items, data.user);
+        renderCartItems(items);
+      })
+      .catch(function () {
+        setAuthControls(null);
+        renderStatus("Failed to load cart. Please try again.");
+        document.getElementById("checkoutBtn").disabled = true;
+      });
+  </script>
+</body>
+</html>
+

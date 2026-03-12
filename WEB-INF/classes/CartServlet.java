@@ -1,108 +1,122 @@
-import java.io.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
-
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
-import jakarta.servlet.annotation.*;
-import java.sql.*;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 @WebServlet("/cart")
 public class CartServlet extends HttpServlet {
 
+   @Override
    protected void doGet(HttpServletRequest request, HttpServletResponse response)
          throws ServletException, IOException {
-			
-      response.setContentType("text/html");
+
+      response.setContentType("application/json");
+      response.setCharacterEncoding("UTF-8");
       PrintWriter out = response.getWriter();
 
-      HttpSession session = request.getSession();
-	  String user = (String) session.getAttribute("user");
-
-      ArrayList<String> cart = (ArrayList<String>) session.getAttribute("cart");
-
-      out.println("<html>");
-      out.println("<head><title>Shopping Cart</title></head>");
-      out.println("<body>");
-
-      out.println("<h2>Your Shopping Cart</h2>");
-	  out.println("<p>Logged in as: "+user+"</p>");
-
-      if(cart == null || cart.size() == 0){
-
-         out.println("<p>Your cart is empty</p>");
-
-      }else{
-
-         out.println("<form method='get' action='eshoporder'>");
-
-         out.println("<table border='1'>");
-		out.println("<tr>");
-		out.println("<th>Select</th>");
-		out.println("<th>ID</th>");
-		out.println("<th>Author</th>");
-		out.println("<th>Title</th>");
-		out.println("<th>Price</th>");
-		out.println("<th>Action</th>");
-		out.println("</tr>");
-
-         try(
-
-				Connection conn = DriverManager.getConnection(
-				"jdbc:mysql://localhost:3306/ebookshop?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC",
-				"myuser","xxxx");
-
-				Statement stmt = conn.createStatement();
-
-				){
-
-				for(String id : cart){
-
-				String sql = "SELECT * FROM books WHERE id=" + id;
-
-				ResultSet rs = stmt.executeQuery(sql);
-
-				if(rs.next()){
-
-				out.println("<tr>");
-
-				out.println("<td><input type='checkbox' name='id' value='" + rs.getString("id") + "'></td>");
-
-				out.println("<td>" + rs.getString("id") + "</td>");
-
-				out.println("<td>" + rs.getString("author") + "</td>");
-
-				out.println("<td>" + rs.getString("title") + "</td>");
-
-				out.println("<td>$" + rs.getString("price") + "</td>");
-				
-				out.println("<td><a href='removefromcart?id="+id+"'>Remove</a></td>");
-
-				out.println("</tr>");
-
-				}
-
-				}
-
-				}catch(Exception e){
-
-				out.println("<p>Error: "+e.getMessage()+"</p>");
-
-				}
-
-         out.println("</table>");
-
-         out.println("<input type='hidden' name='cust_name' value='"+user+"'>");
-		out.println("<input type='hidden' name='cust_email' value='"+user+"'>");
-		out.println("<input type='hidden' name='cust_phone' value=''>");
-
-         out.println("<input type='submit' value='CHECKOUT'>");
-
-         out.println("</form>");
+      HttpSession session = request.getSession(false);
+      String user = null;
+      ArrayList<String> cart = null;
+      if (session != null) {
+         user = (String) session.getAttribute("user");
+         cart = (ArrayList<String>) session.getAttribute("cart");
       }
 
-      out.println("<br><a href='shop.html'>Continue Shopping</a>");
+      StringBuilder json = new StringBuilder();
+      json.append("{");
+      json.append("\"user\":").append(toJsonString(user)).append(",");
+      json.append("\"items\":[");
 
-      out.println("</body>");
-      out.println("</html>");
+      boolean first = true;
+
+      if (cart != null && !cart.isEmpty()) {
+         try (
+               Connection conn = DriverManager.getConnection(
+                     "jdbc:mysql://localhost:3306/ebookshop?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC",
+                     "myuser", "xxxx");
+               PreparedStatement pstmt = conn.prepareStatement(
+                     "SELECT id, author, title, price FROM books WHERE id = ?")
+         ) {
+            for (String id : cart) {
+               pstmt.setString(1, id);
+               try (ResultSet rs = pstmt.executeQuery()) {
+                  if (rs.next()) {
+                     if (!first) {
+                        json.append(",");
+                     }
+                     json.append("{");
+                     json.append("\"id\":").append(toJsonString(rs.getString("id"))).append(",");
+                     json.append("\"author\":").append(toJsonString(rs.getString("author"))).append(",");
+                     json.append("\"title\":").append(toJsonString(rs.getString("title"))).append(",");
+                     json.append("\"price\":").append(toJsonString(rs.getString("price")));
+                     json.append("}");
+                     first = false;
+                  }
+               }
+            }
+         } catch (SQLException ex) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            out.print("{\"error\":\"Failed to load cart items.\"}");
+            return;
+         }
+      }
+
+      json.append("]}");
+      out.print(json.toString());
+   }
+
+   private static String toJsonString(String value) {
+      if (value == null) {
+         return "null";
+      }
+      return "\"" + escapeJson(value) + "\"";
+   }
+
+   private static String escapeJson(String value) {
+      StringBuilder escaped = new StringBuilder();
+      for (int i = 0; i < value.length(); i++) {
+         char c = value.charAt(i);
+         switch (c) {
+            case '"':
+               escaped.append("\\\"");
+               break;
+            case '\\':
+               escaped.append("\\\\");
+               break;
+            case '\b':
+               escaped.append("\\b");
+               break;
+            case '\f':
+               escaped.append("\\f");
+               break;
+            case '\n':
+               escaped.append("\\n");
+               break;
+            case '\r':
+               escaped.append("\\r");
+               break;
+            case '\t':
+               escaped.append("\\t");
+               break;
+            default:
+               if (c < 0x20) {
+                  escaped.append(String.format("\\u%04x", (int) c));
+               } else {
+                  escaped.append(c);
+               }
+               break;
+         }
+      }
+      return escaped.toString();
    }
 }

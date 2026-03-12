@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Query Results | Tome</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="query-results.css">
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <h1 class="logo"><a href="shop.html">&#x1F4DA; Tome</a></h1>
+      <nav>
+        <a href="cart.html">Cart</a>
+      </nav>
+      <div id="authControls"></div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <h2>Query Results</h2>
+    <p class="muted" id="filterSummary"></p>
+
+    <form id="addToCartForm" method="get" action="addtocart">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Select</th>
+            <th>ID</th>
+            <th>Author</th>
+            <th>Title</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody">
+          <tr>
+            <td colspan="5" class="status">Loading results...</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="actions">
+        <button type="submit" id="addBtn">Add Selected To Cart</button>
+        <a class="link-btn" href="shop.html">Back to Shop</a>
+      </div>
+    </form>
+  </main>
+
+  <script src="auth.js"></script>
+  <script>
+    function formatSummary(params) {
+      const search = params.get("search");
+      const authors = params.getAll("author");
+      const parts = [];
+
+      if (search && search.trim() !== "") {
+        parts.push("Search: \"" + search.trim() + "\"");
+      }
+      if (authors.length > 0) {
+        parts.push("Authors: " + authors.join(", "));
+      }
+      if (parts.length === 0) {
+        return "Showing all available books.";
+      }
+      return parts.join(" | ");
+    }
+
+    function renderBooks(books) {
+      const body = document.getElementById("resultsBody");
+      body.innerHTML = "";
+
+      if (!books || books.length === 0) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 5;
+        cell.className = "status";
+        cell.textContent = "No books found.";
+        row.appendChild(cell);
+        body.appendChild(row);
+        return;
+      }
+
+      books.forEach(function (book) {
+        const row = document.createElement("tr");
+
+        const selectCell = document.createElement("td");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.name = "id";
+        checkbox.value = String(book.id);
+        selectCell.appendChild(checkbox);
+
+        const idCell = document.createElement("td");
+        idCell.textContent = String(book.id);
+
+        const authorCell = document.createElement("td");
+        authorCell.textContent = book.author;
+
+        const titleCell = document.createElement("td");
+        titleCell.textContent = book.title;
+
+        const priceCell = document.createElement("td");
+        priceCell.textContent = "$" + book.price;
+
+        row.appendChild(selectCell);
+        row.appendChild(idCell);
+        row.appendChild(authorCell);
+        row.appendChild(titleCell);
+        row.appendChild(priceCell);
+
+        body.appendChild(row);
+      });
+    }
+
+    function renderError(message) {
+      const body = document.getElementById("resultsBody");
+      body.innerHTML = "";
+
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 5;
+      cell.className = "status";
+      cell.textContent = message;
+      row.appendChild(cell);
+      body.appendChild(row);
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    document.getElementById("filterSummary").textContent = formatSummary(params);
+
+    fetch("eshopquery?" + params.toString(), {
+      headers: { "Accept": "application/json" }
+    })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("Unable to load query results.");
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        setAuthControls(data.user);
+        renderBooks(data.books);
+      })
+      .catch(function () {
+        setAuthControls(null);
+        renderError("Failed to load results. Please try again.");
+      });
+
+    document.getElementById("addToCartForm").addEventListener("submit", function (event) {
+      const selected = document.querySelectorAll("input[name='id']:checked");
+      if (selected.length === 0) {
+        event.preventDefault();
+        alert("Please select at least one book.");
+      }
+    });
+  </script>
+</body>
+</html>
+

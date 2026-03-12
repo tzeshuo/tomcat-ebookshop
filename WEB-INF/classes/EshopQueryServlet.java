@@ -1,126 +1,142 @@
-// To save as "ebookshop\WEB-INF\classes\QueryServlet.java".
-import java.io.*;
-import java.sql.*;
-import jakarta.servlet.*;            // Tomcat 10 (Jakarta EE 9)
-import jakarta.servlet.http.*;
-import jakarta.servlet.annotation.*;
-//import javax.servlet.*;            // Tomcat 9 (Java EE 8 / Jakarta EE 8)
-//import javax.servlet.http.*;
-//import javax.servlet.annotation.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
-@WebServlet("/eshopquery")   // Configure the request URL for this servlet (Tomcat 7/Servlet 3.0 upwards)
+@WebServlet("/eshopquery")
 public class EshopQueryServlet extends HttpServlet {
 
-   // The doGet() runs once per HTTP GET request to this servlet.
    @Override
    public void doGet(HttpServletRequest request, HttpServletResponse response)
-               throws ServletException, IOException {
-	  
-	  HttpSession session = request.getSession(false);
-	  String user = (String) session.getAttribute("user");		
-      // Set the MIME type for the response message
-      response.setContentType("text/html");
-      // Get a output writer to write the response message into the network socket
+         throws ServletException, IOException {
+      response.setContentType("application/json");
+      response.setCharacterEncoding("UTF-8");
       PrintWriter out = response.getWriter();
-      // Print an HTML page as the output of the query
-      out.println("<!DOCTYPE html>");
-      out.println("<html>");
-      out.println("<head><title>Query Response</title></head>");
-      out.println("<body>");
+
+      HttpSession session = request.getSession(false);
+      String user = session == null ? null : (String) session.getAttribute("user");
+
+      String[] authors = request.getParameterValues("author");
+      String search = request.getParameter("search");
+      if (search != null) {
+         search = search.trim();
+      }
+
+      StringBuilder sql = new StringBuilder("SELECT id, author, title, price FROM books WHERE qty > 0");
+      List<String> sqlParams = new ArrayList<>();
+
+      if (authors != null && authors.length > 0) {
+         sql.append(" AND author IN (");
+         for (int i = 0; i < authors.length; i++) {
+            sql.append("?");
+            if (i < authors.length - 1) {
+               sql.append(",");
+            }
+            sqlParams.add(authors[i]);
+         }
+         sql.append(")");
+      }
+
+      if (search != null && !search.isEmpty()) {
+         sql.append(" AND title LIKE ?");
+         sqlParams.add("%" + search + "%");
+      }
+
+      sql.append(" ORDER BY author ASC, title ASC");
+
+      StringBuilder json = new StringBuilder();
+      json.append("{");
+      json.append("\"user\":").append(toJsonString(user)).append(",");
+      json.append("\"books\":[");
 
       try (
-         // Step 1: Allocate a database 'Connection' object
-         Connection conn = DriverManager.getConnection(
-               "jdbc:mysql://localhost:3306/ebookshop?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC",
-               "myuser", "xxxx");   // For MySQL
-               // The format is: "jdbc:mysql://hostname:port/databaseName", "username", "password"
-
-         // Step 2: Allocate a 'Statement' object in the Connection
-         Statement stmt = conn.createStatement();
+            Connection conn = DriverManager.getConnection(
+                  "jdbc:mysql://localhost:3306/ebookshop?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC",
+                  "myuser", "xxxx");
+            PreparedStatement pstmt = conn.prepareStatement(sql.toString())
       ) {
-         // Step 3: Execute a SQL SELECT query
-         // === Form the SQL command - BEGIN ===
-			String[] authors = request.getParameterValues("author");
-			String search = request.getParameter("search");
+         for (int i = 0; i < sqlParams.size(); i++) {
+            pstmt.setString(i + 1, sqlParams.get(i));
+         }
 
-			boolean hasAuthor = (authors != null && authors.length > 0);
-			boolean hasSearch = (search != null && !search.trim().isEmpty());
+         try (ResultSet rset = pstmt.executeQuery()) {
+            boolean first = true;
+            while (rset.next()) {
+               if (!first) {
+                  json.append(",");
+               }
+               json.append("{");
+               json.append("\"id\":").append(toJsonString(rset.getString("id"))).append(",");
+               json.append("\"author\":").append(toJsonString(rset.getString("author"))).append(",");
+               json.append("\"title\":").append(toJsonString(rset.getString("title"))).append(",");
+               json.append("\"price\":").append(toJsonString(rset.getString("price")));
+               json.append("}");
+               first = false;
+            }
+         }
+      } catch (SQLException ex) {
+         response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+         out.print("{\"error\":\"Failed to load query results.\"}");
+         return;
+      }
 
-			String sqlStr = "SELECT * FROM books WHERE qty > 0";
+      json.append("]}");
+      out.print(json.toString());
+   }
 
-			if (hasAuthor) {
-			   sqlStr += " AND author IN (";
-			   for (int i = 0; i < authors.length; ++i) {
-				  if (i < authors.length - 1) {
-					 sqlStr += "'" + authors[i] + "', ";
-				  } else {
-					 sqlStr += "'" + authors[i] + "'";
-				  }
-			   }
-			   sqlStr += ")";
-			}
+   private static String toJsonString(String value) {
+      if (value == null) {
+         return "null";
+      }
+      return "\"" + escapeJson(value) + "\"";
+   }
 
-			if (hasSearch) {
-			   sqlStr += " AND title LIKE '%" + search + "%'";
-			}
-
-			sqlStr += " ORDER BY author ASC, title ASC";
-		
-         out.println("<h3>Thank you for your query.</h3>");
-         //out.println("<p>Your SQL statement is: " + sqlStr + "</p>"); // Echo for debugging
-         ResultSet rset = stmt.executeQuery(sqlStr);  // Send the query to the server
-		 boolean hasResult = false;
-		 
-         // Step 4: Process the query result
-         // Print the <form> start tag
-         out.println("<form method='get' action='addtocart'>");
-                  		 
-         // For each row in ResultSet, print one checkbox inside the <form>
-         
-		out.println("<table border='1'>");
-		out.println("<tr>");
-		out.println("<th>Select</th>");
-		out.println("<th>ID</th>");
-		out.println("<th>Author</th>");
-		out.println("<th>Title</th>");
-		out.println("<th>Price</th>");
-		out.println("</tr>");
-		 
-		 while(rset.next()) {
-			   hasResult = true;
-			   out.println("<tr>");
-			   out.println("<td><input type='checkbox' name='id' value='"
-					 + rset.getString("id") + "' /></td>");
-			   out.println("<td>" + rset.getString("id") + "</td>");
-			   out.println("<td>" + rset.getString("author") + "</td>");
-			   out.println("<td>" + rset.getString("title") + "</td>");
-			   out.println("<td>$" + rset.getString("price") + "</td>");
-			   out.println("</tr>");
-			}
-		 if (!hasResult) {
-		   out.println("<tr><td colspan='5'>No books found.</td></tr>");
-			}
-		 
-		 out.println("</table>");
-		 
-		 /*
-		 out.println("<p>Enter your Name: <input type='text' name='cust_name' required /></p>");
-         out.println("<p>Enter your Email: <input type='email' name='cust_email' required /></p>");
-         out.println("<p>Enter your Phone Number: <input type='text' name='cust_phone' /></p>");
-		*/
-		
-         // Print the submit button and </form> end-tag
-         out.println("<p><input type='submit' value='ORDER' />");
-         out.println("</form>");
-
-         // === Step 4 ends HERE - Do NOT delete the following codes ===
-      } catch(SQLException ex) {
-         out.println("<p>Error: " + ex.getMessage() + "</p>");
-         out.println("<p>Check Tomcat console for details.</p>");
-         ex.printStackTrace();
-      }  // Step 5: Close conn and stmt - Done automatically by try-with-resources (JDK 7)
- 
-      out.println("</body></html>");
-      out.close();
+   private static String escapeJson(String value) {
+      StringBuilder escaped = new StringBuilder();
+      for (int i = 0; i < value.length(); i++) {
+         char c = value.charAt(i);
+         switch (c) {
+            case '"':
+               escaped.append("\\\"");
+               break;
+            case '\\':
+               escaped.append("\\\\");
+               break;
+            case '\b':
+               escaped.append("\\b");
+               break;
+            case '\f':
+               escaped.append("\\f");
+               break;
+            case '\n':
+               escaped.append("\\n");
+               break;
+            case '\r':
+               escaped.append("\\r");
+               break;
+            case '\t':
+               escaped.append("\\t");
+               break;
+            default:
+               if (c < 0x20) {
+                  escaped.append(String.format("\\u%04x", (int) c));
+               } else {
+                  escaped.append(c);
+               }
+               break;
+         }
+      }
+      return escaped.toString();
    }
 }

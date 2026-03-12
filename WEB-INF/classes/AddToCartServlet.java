@@ -13,7 +13,11 @@ public class AddToCartServlet extends HttpServlet {
 
       String[] ids = request.getParameterValues("id");
 
-      HttpSession session = request.getSession();
+      HttpSession session = request.getSession(false);
+      if (session == null || session.getAttribute("user") == null) {
+         response.sendRedirect("login.html?required=1");
+         return;
+      }
 
       ArrayList<String> cart = (ArrayList<String>) session.getAttribute("cart");
 
@@ -29,6 +33,6 @@ public class AddToCartServlet extends HttpServlet {
 
       session.setAttribute("cart", cart);
 
-      response.sendRedirect("cart");
+      response.sendRedirect("cart.html");
    }
 }

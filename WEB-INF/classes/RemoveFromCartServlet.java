@@ -23,6 +23,6 @@ public class RemoveFromCartServlet extends HttpServlet {
 
       session.setAttribute("cart", cart);
 
-      response.sendRedirect("cart");
+      response.sendRedirect("cart.html");
    }
 }

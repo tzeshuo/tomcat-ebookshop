@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <title>Tome</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="login.css">
 </head>
 
 <body>
@@ -13,16 +14,13 @@
 
 <div class="topbar">
 
-<h1 class="logo">📚 Tome</h1>
+<h1 class="logo"><a href="shop.html">&#x1F4DA; Tome</a></h1>
 
 <nav>
-<a href="shop.html">Home</a>
-<a href="login.html">Login</a>
-<a href="register.html">Register</a>
-<a href="eshoplogout">Logout</a>
+<a href="cart.html">Cart</a>
 </nav>
 
-<div id="userDisplay"></div>
+<div id="authControls"></div>
 
 </div>
 
@@ -48,17 +46,30 @@
 
 <footer>
 
-© 2026 Tome
+&copy; 2026 Tome
 
 </footer>
 
-</body>
-</html>
-
+<script src="auth.js"></script>
 <script>
 const params = new URLSearchParams(window.location.search);
 
-if(params.get("register") === "success"){
-   alert("Registration successful! Please login.");
+if (params.get("register") === "success") {
+  alert("Registration successful! Please login.");
 }
+
+if (params.get("required") === "1") {
+  alert("Please login before adding items to cart.");
+}
+
+fetchSessionUser()
+  .then(function (user) {
+    setAuthControls(user);
+  })
+  .catch(function () {
+    setAuthControls(null);
+  });
 </script>
+
+</body>
+</html>
