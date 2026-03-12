@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Placed | Tome</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="order.css">
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <h1 class="logo"><a href="shop.html">&#x1F4DA; Tome</a></h1>
+      <nav>
+        <a href="cart.html">Cart</a>
+      </nav>
+      <div id="authControls"></div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <div class="order-card" id="orderCard">
+      <h2 id="orderTitle">Order status</h2>
+      <p class="muted" id="orderMessage">Checking your order details...</p>
+      <div class="actions">
+        <a class="link-btn primary-link" href="shop.html">Continue Shopping</a>
+        <a class="link-btn" href="cart.html">Back to Cart</a>
+      </div>
+    </div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script>
+    fetchSessionUser()
+      .then(function (user) {
+        setAuthControls(user);
+      })
+      .catch(function () {
+        setAuthControls(null);
+      });
+
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    const count = Number(params.get("count") || "0");
+    const orderCard = document.getElementById("orderCard");
+    const title = document.getElementById("orderTitle");
+    const message = document.getElementById("orderMessage");
+
+    if (status === "success") {
+      orderCard.classList.add("success");
+      title.textContent = "Order placed successfully";
+      message.textContent = "We confirmed " + count + " item(s). Thank you for your purchase.";
+    } else if (status === "empty") {
+      orderCard.classList.add("warning");
+      title.textContent = "No items selected";
+      message.textContent = "Please return to your cart and select at least one item before checkout.";
+    } else if (status === "outofstock") {
+      orderCard.classList.add("warning");
+      title.textContent = "Order not completed";
+      message.textContent = "The selected items are unavailable or out of stock.";
+    } else {
+      orderCard.classList.add("error");
+      title.textContent = "Unable to place order";
+      message.textContent = "We hit a problem while processing your order. Please try again.";
+    }
+  </script>
+</body>
+</html>

@@ -1,95 +1,103 @@
-// To save as "ebookshop\WEB-INF\classes\QueryServlet.java".
-import java.io.*;
-import java.sql.*;
-import jakarta.servlet.*;            // Tomcat 10 (Jakarta EE 9)
-import jakarta.servlet.http.*;
-import jakarta.servlet.annotation.*;
-//import javax.servlet.*;            // Tomcat 9 (Java EE 8 / Jakarta EE 8)
-//import javax.servlet.http.*;
-//import javax.servlet.annotation.*;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
-@WebServlet("/eshoporder")   // Configure the request URL for this servlet (Tomcat 7/Servlet 3.0 upwards)
+@WebServlet("/eshoporder")
 public class EshopOrderServlet extends HttpServlet {
 
-   // The doGet() runs once per HTTP GET request to this servlet.
    @Override
    public void doGet(HttpServletRequest request, HttpServletResponse response)
-               throws ServletException, IOException {
-	  HttpSession session = request.getSession(false);
-	  String user = (String) session.getAttribute("user");
-	  String email = (String) session.getAttribute("user");
-      // Set the MIME type for the response message
-      response.setContentType("text/html");
-      // Get a output writer to write the response message into the network socket
-      PrintWriter out = response.getWriter();
-      // Print an HTML page as the output of the query
-      out.println("<!DOCTYPE html>");
-      out.println("<html>");
-      out.println("<head><title>Query Response</title></head>");
-      out.println("<body>");
+         throws ServletException, IOException {
+      HttpSession session = request.getSession(false);
+      if (session == null || session.getAttribute("user") == null) {
+         response.sendRedirect("login.html?required=1");
+         return;
+      }
+
+      String email = (String) session.getAttribute("user");
+      String[] ids = request.getParameterValues("id");
+      if (ids == null || ids.length == 0) {
+         response.sendRedirect("order-placed.html?status=empty");
+         return;
+      }
+
+      String custName = email;
+      String custEmail = email;
+      String custPhone = "";
+      int successCount = 0;
 
       try (
-         // Step 1: Allocate a database 'Connection' object
-         Connection conn = DriverManager.getConnection(
-               "jdbc:mysql://localhost:3306/ebookshop?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC",
-               "myuser", "xxxx");   // For MySQL
-               // The format is: "jdbc:mysql://hostname:port/databaseName", "username", "password"
-
-         // Step 2: Allocate a 'Statement' object in the Connection
-         Statement stmt = conn.createStatement();
+            Connection conn = DriverManager.getConnection(
+                  "jdbc:mysql://localhost:3306/ebookshop?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC",
+                  "myuser", "xxxx");
+            PreparedStatement userStmt = conn.prepareStatement(
+                  "SELECT name, email, phone FROM users WHERE email = ?");
+            PreparedStatement updateBookStmt = conn.prepareStatement(
+                  "UPDATE books SET qty = qty - 1 WHERE id = ? AND qty > 0");
+            PreparedStatement insertOrderStmt = conn.prepareStatement(
+                  "INSERT INTO order_records (id, qty_ordered, cust_name, cust_email, cust_phone) VALUES (?, 1, ?, ?, ?)")
       ) {
-         // Step 3 & 4: Execute a SQL SELECT query and Process the query result
-         // Retrieve the books' id. Can order more than one books.
-         String[] ids = request.getParameterValues("id");
-		String cust_name = "";
-		String cust_email = "";
-		String cust_phone = "";
-
-		String sqlUser = "SELECT name, email, phone FROM users WHERE email='" + email + "'";
-		ResultSet userSet = stmt.executeQuery(sqlUser);
-
-		if(userSet.next()){
-			cust_name = userSet.getString("name");
-			cust_email = userSet.getString("email");
-			cust_phone = userSet.getString("phone");
-		}
-         if (ids != null) {
-            String sqlStr;
-            int count;
-			out.println("<h2>Order placed by: " + user + "</h2>");
- 
-            // Process each of the books
-            for (int i = 0; i < ids.length; ++i) {
-               // Update the qty of the table books
-               sqlStr = "UPDATE books SET qty = qty - 1 WHERE id = " + ids[i];
-               out.println("<p>" + sqlStr + "</p>");  // for debugging
-               count = stmt.executeUpdate(sqlStr);
-               out.println("<p>" + count + " record updated.</p>");
- 
-               // Create a transaction record
-               sqlStr = "INSERT INTO order_records (id, qty_ordered, cust_name, cust_email, cust_phone) VALUES ("
-				+ ids[i] + ", 1, '" 
-				+ cust_name + "', '" 
-				+ cust_email + "', '" 
-				+ cust_phone + "')";
-               out.println("<p>" + sqlStr + "</p>");  // for debugging
-               count = stmt.executeUpdate(sqlStr);
-               out.println("<p>" + count + " record inserted.</p>");
-               out.println("<h3>Your order for book id=" + ids[i]
-                     + " has been confirmed.</h3>");
+         userStmt.setString(1, email);
+         try (ResultSet userSet = userStmt.executeQuery()) {
+            if (userSet.next()) {
+               custName = userSet.getString("name");
+               custEmail = userSet.getString("email");
+               custPhone = userSet.getString("phone");
             }
-            out.println("<h3>Thank you.<h3>");
-         } else { // No book selected
-            out.println("<h3>Please go back and select a book...</h3>");
          }
-         // === Step 4 ends HERE - Do NOT delete the following codes ===
-      } catch(SQLException ex) {
-         out.println("<p>Error: " + ex.getMessage() + "</p>");
-         out.println("<p>Check Tomcat console for details.</p>");
-         ex.printStackTrace();
-      }  // Step 5: Close conn and stmt - Done automatically by try-with-resources (JDK 7)
- 
-      out.println("</body></html>");
-      out.close();
+
+         for (String id : ids) {
+            int bookId;
+            try {
+               bookId = Integer.parseInt(id);
+            } catch (NumberFormatException ex) {
+               continue;
+            }
+
+            updateBookStmt.setInt(1, bookId);
+            int updatedRows = updateBookStmt.executeUpdate();
+            if (updatedRows == 0) {
+               continue;
+            }
+
+            insertOrderStmt.setInt(1, bookId);
+            insertOrderStmt.setString(2, custName);
+            insertOrderStmt.setString(3, custEmail);
+            insertOrderStmt.setString(4, custPhone);
+            insertOrderStmt.executeUpdate();
+            successCount++;
+         }
+      } catch (SQLException ex) {
+         response.sendRedirect("order-placed.html?status=error");
+         return;
+      }
+
+      if (successCount > 0) {
+         removePurchasedFromCart(session, ids);
+         response.sendRedirect("order-placed.html?status=success&count=" + successCount);
+      } else {
+         response.sendRedirect("order-placed.html?status=outofstock");
+      }
+   }
+
+   private void removePurchasedFromCart(HttpSession session, String[] ids) {
+      ArrayList<String> cart = (ArrayList<String>) session.getAttribute("cart");
+      if (cart == null || cart.isEmpty()) {
+         return;
+      }
+      for (String id : ids) {
+         cart.remove(id);
+      }
+      session.setAttribute("cart", cart);
    }
 }
