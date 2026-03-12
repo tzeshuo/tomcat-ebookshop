@@ -37,6 +37,7 @@ public class CartServlet extends HttpServlet {
 
          out.println("<table border='1'>");
 		out.println("<tr>");
+		out.println("<th>Select</th>");
 		out.println("<th>ID</th>");
 		out.println("<th>Author</th>");
 		out.println("<th>Title</th>");
@@ -63,6 +64,8 @@ public class CartServlet extends HttpServlet {
 				if(rs.next()){
 
 				out.println("<tr>");
+
+				out.println("<td><input type='checkbox' name='id' value='" + rs.getString("id") + "'></td>");
 
 				out.println("<td>" + rs.getString("id") + "</td>");
 
