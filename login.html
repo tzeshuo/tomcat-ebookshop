@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>Tome</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+
+<div class="topbar">
+
+<h1 class="logo">📚 Tome</h1>
+
+<nav>
+<a href="shop.html">Home</a>
+<a href="login.html">Login</a>
+<a href="register.html">Register</a>
+<a href="eshoplogout">Logout</a>
+</nav>
+
+<div id="userDisplay"></div>
+
+</div>
+
+</header>
+
+<div class="container">
+
+<h2>Customer Login</h2>
+
+<form method="post" action="eshoplogin">
+
+<label>Email</label><br>
+<input type="email" name="email" required><br><br>
+
+<label>Password</label><br>
+<input type="password" name="password" required><br><br>
+
+<button type="submit">Login</button>
+
+</form>
+
+</div>
+
+<footer>
+
+© 2026 Tome
+
+</footer>
+
+</body>
+</html>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+
+if(params.get("register") === "success"){
+   alert("Registration successful! Please login.");
+}
+</script>

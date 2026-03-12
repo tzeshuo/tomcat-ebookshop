@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>Tome</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+
+<div class="topbar">
+
+<h1 class="logo">📚 Tome</h1>
+
+<nav>
+<a href="shop.html">Home</a>
+<a href="login.html">Login</a>
+<a href="register.html">Register</a>
+<a href="eshoplogout">Logout</a>
+</nav>
+
+<div id="userDisplay"></div>
+
+</div>
+
+</header>
+
+
+<div class="hero">
+
+<h2>Discover Your Next Favourite Book</h2>
+
+<p>Browse best sellers and explore books by your favourite authors.</p>
+
+</div>
+
+
+<div class="slider-container">
+
+<h2>🔥 Hot Selling Books</h2>
+
+<div class="carousel">
+
+<button class="nav prev" onclick="moveSlide(-1)">❮</button>
+
+<div class="carousel-track">
+
+<img src="images/maze runner 1.png" class="carousel-item">
+<img src="images/maze runner 2.png" class="carousel-item">
+<img src="images/maze runner 3.png" class="carousel-item">
+<img src="images/maze runner 4.png" class="carousel-item">
+<img src="images/maze runner 5.png" class="carousel-item">
+
+</div>
+
+<button class="nav next" onclick="moveSlide(1)">❯</button>
+
+</div>
+
+</div>
+
+
+<div class="container">
+
+<h2>Find Books</h2>
+
+<form method="get" action="eshopquery">
+
+<input type="text" name="search" placeholder="Search book title..." class="searchBox">
+
+<h3>Filter by Author</h3>
+
+<div class="author-grid">
+
+<label><input type="checkbox" name="author" value="Tan Ah Teck"> Tan Ah Teck</label>
+
+<label><input type="checkbox" name="author" value="Mohammad Ali"> Mohammad Ali</label>
+
+<label><input type="checkbox" name="author" value="Kumar"> Kumar</label>
+
+<label><input type="checkbox" name="author" value="Kevin Jones"> Kevin Jones</label>
+
+<label><input type="checkbox" name="author" value="James Dashner"> James Dashner</label>
+
+</div>
+
+<button type="submit" class="searchBtn">Search Books</button>
+
+</form>
+
+</div>
+
+
+<script>
+
+
+const params = new URLSearchParams(window.location.search);
+const user = params.get("user");
+
+if(user){
+document.getElementById("userDisplay").innerHTML = "👤 " + user;
+}
+
+
+
+let items = document.querySelectorAll(".carousel-item");
+let index = 2;
+
+function updateCarousel(){
+
+items.forEach(item=>{
+item.style.display = "none";
+item.classList.remove("active","side");
+});
+
+let left = index - 1;
+let right = index + 1;
+
+if(left < 0) left = items.length - 1;
+if(right >= items.length) right = 0;
+
+items[left].style.display = "block";
+items[index].style.display = "block";
+items[right].style.display = "block";
+
+items[index].classList.add("active");
+items[left].classList.add("side");
+items[right].classList.add("side");
+
+}
+
+function moveSlide(step){
+
+index += step;
+
+if(index < 0) index = items.length - 1;
+if(index >= items.length) index = 0;
+
+updateCarousel();
+
+}
+
+setInterval(()=>{
+moveSlide(1);
+},5000);
+
+updateCarousel();
+
+</script>
+
+
+<footer>
+
+© 2026 Tome
+
+</footer>
+
+</body>
+
+</html>
